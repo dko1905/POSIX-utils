@@ -1,3 +1,4 @@
+/* Copyright (c) 2021, horenso */
 #include <fts.h>
 #include <getopt.h>
 #include <stdbool.h>
@@ -5,10 +6,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-#include "ls.h"
+#define LONG_LISTING_OPT 'l'
+#define SHOW_ALL_OPT     'a'
 
-void init_options(Options *options) {
+typedef struct {
+    bool long_listing;
+    bool show_all;
+} Options;
+
+static void init_options(Options *options) {
     options->show_all = false;
     options->long_listing = false;
 }
