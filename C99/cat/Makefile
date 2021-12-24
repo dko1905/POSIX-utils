@@ -1,5 +1,7 @@
 .POSIX:
 
+include ../config.mk
+
 all: cat
 
 cat: main.c
