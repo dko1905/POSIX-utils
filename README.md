@@ -1,5 +1,5 @@
 # POSIX utilities
-Collection of utilities implemented exactly how POSIX defines. 
+Utilities implemented as specified by [POSIX.1-2017](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html).
 
 ## Style guide
 A mix between

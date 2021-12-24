@@ -1,3 +1,4 @@
+/* Copyright (c) 2021, Daniel Florescu */
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
