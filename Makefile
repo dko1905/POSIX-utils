@@ -2,7 +2,7 @@
 
 include config.mk
 
-PROGS=cat ls echo false true
+PROGS=cat ls echo false true link unlink
 
 all: $(PROGS)
 
@@ -11,4 +11,3 @@ all: $(PROGS)
 
 clean:
 	rm -f $(PROGS)
-
