@@ -1,3 +1,4 @@
+/* Copyright (c) 2021, Daniel Florescu */
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
