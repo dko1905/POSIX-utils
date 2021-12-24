@@ -26,8 +26,8 @@ int main(int argc, char *argv[])
 			if (octal_state > 0) {
 				/* Support "\0[x[x[x]]]"
 				 * When "\0" */
-				if (octal_state != 4 && (c >= '0' && c <= '7')
-				    && !eof) {
+				if (octal_state != 4 && (c >= '0' && c <= '7') &&
+				    !eof) {
 					octal_buffer[octal_state - 1] = c;
 					octal_state++;
 				} else {
@@ -78,8 +78,10 @@ int main(int argc, char *argv[])
 					putchar('\v');
 					break;
 				case '0':
-					if (eof) putchar('\0');
-					else octal_state = 1;
+					if (eof)
+						putchar('\0');
+					else
+						octal_state = 1;
 					break;
 				default:
 					putchar('\\');
