@@ -2,7 +2,7 @@
 
 include config.mk
 
-PROGS=cat ls echo false
+PROGS=cat ls echo false true
 
 all: $(PROGS)
 
