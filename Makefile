@@ -2,15 +2,13 @@
 
 include config.mk
 
-all: cat ls
+PROGS=cat ls echo
 
-cat: cat.c
-	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
-ls: ls.c
-	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
-echo: echo.c
+all: $(PROGS)
+
+.c:
 	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
 
 clean:
-	rm -f cat ls
+	rm -f $(PROGS)
 
