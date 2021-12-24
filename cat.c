@@ -1,22 +1,22 @@
 /* Copyright (c) 2021, Daniel Florescu */
+#include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <string.h>
-#include <errno.h>
 
 /* The OpenBSD version uses usefull BSD functions that we don't have,
  * we must therefore recreate some, like progname. */
 static char *progname = "";
 
-#define die(...) { \
-	fprintf(stderr, "%s: ", progname); \
-	fprintf(stderr, __VA_ARGS__); \
-	fprintf(stderr, "\n"); \
-	exit(1); \
-}
+#define die(...)                                   \
+	{                                          \
+		fprintf(stderr, "%s: ", progname); \
+		fprintf(stderr, __VA_ARGS__);      \
+		fprintf(stderr, "\n");             \
+		exit(1);                           \
+	}
 
 static void cat(const char *name, FILE *fp);
 
