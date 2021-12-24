@@ -8,6 +8,8 @@ cat: cat.c
 	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
 ls: ls.c
 	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
+echo: echo.c
+	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
 
 clean:
 	rm -f cat ls
