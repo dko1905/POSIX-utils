@@ -4,7 +4,8 @@
 
 int main(int argc, char *argv[])
 {
-	bool backslash_flag = false, newline_flag = true, eof = false;
+	bool backslash_state = false, newline_flag = true;
+	bool eof = false; /* End of current argument. */
 	size_t len = 0;
 	int c = 0, octal_state = 0;
 	char octal_buffer[4] = {0}; /* "xxx\0" */
@@ -29,6 +30,10 @@ int main(int argc, char *argv[])
 					octal_buffer[octal_state - 1] = c;
 					octal_state++;
 				} else {
+					if (eof) {
+						octal_buffer[octal_state - 1] = c;
+						octal_state++;
+					}
 					/* Parse octal into octal_number.
 					 * We don't care if it fails. */
 					sscanf(octal_buffer, "%o", &octal_number);
@@ -40,8 +45,8 @@ int main(int argc, char *argv[])
 					octal_number = 0;
 					memset(octal_buffer, 0, sizeof(octal_buffer));
 				}
-			} else if (backslash_flag) {
-				backslash_flag = false;
+			} else if (backslash_state) {
+				backslash_state = false;
 
 				switch (c) {
 				case '\\':
@@ -72,7 +77,8 @@ int main(int argc, char *argv[])
 					putchar('\v');
 					break;
 				case '0':
-					octal_state = 1;
+					if (eof) putchar('\0');
+					else octal_state = 1;
 					break;
 				default:
 					putchar('\\');
@@ -82,7 +88,7 @@ int main(int argc, char *argv[])
 				if (eof)
 					putchar('\\');
 				else
-					backslash_flag = true;
+					backslash_state = true;
 			} else {
 				putchar(c);
 			}
