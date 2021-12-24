@@ -33,20 +33,13 @@ int main(int argc, char *argv[])
 		case 'u':
 			setvbuf(stdout, NULL, _IONBF, 0);
 			break;
-		case '-':
-			goto break_getopt;
 		default:
 			fprintf(stderr, "usage: %s [-u] [file ...]\n", progname);
 			return 1;
 		}
-
-		argc--;
-		argv++;
 	}
-	/* Remove progname from argc & argv. */
-	argc--;
-	argv++;
-	break_getopt:
+	argc -= optind;
+	argv += optind;
 
 	if (argc == 0) {
 		cat("stdin", stdin);
