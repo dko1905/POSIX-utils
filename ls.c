@@ -10,7 +10,10 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
+
+#define TIME_STR_LEN 100
 
 #define LONG_LISTING_OPT 'l'
 #define SHOW_ALL_OPT 'a'
@@ -24,7 +27,8 @@ typedef struct {
 	int user_width;
 	int group_width;
 	int size_width;
-} LonglistingWidths;
+	int total_block_count;
+} FirstRun;
 
 static void init_options(Options *options)
 {
@@ -52,8 +56,7 @@ static void parse_args(int argc, char **argv, Options *options)
 	}
 }
 
-static int compare_files_by_name(const FTSENT **ftsent_1,
-				 const FTSENT **ftsent_2)
+static int compare_files_by_name(const FTSENT **ftsent_1, const FTSENT **ftsent_2)
 {
 	return strcmp((*ftsent_1)->fts_name, (*ftsent_2)->fts_name);
 }
@@ -68,14 +71,30 @@ static int number_of_digits(size_t num)
 	return digits;
 }
 
-static void calculate_widths(FTSENT *first_file, LonglistingWidths *widths)
+static bool should_skip_file(FTSENT *file, Options *options)
 {
-	widths->user_width = 0;
-	widths->group_width = 0;
+	if (file->fts_info == FTS_DOT && !options->show_all) {
+		return true;
+	}
+	if (file->fts_name[0] == '.' && !options->show_all) {
+		return true;
+	}
+	return false;
+}
+
+static void do_first_run(FTSENT *first_file, FirstRun *first_run, Options *options)
+{
+	first_run->user_width = 0;
+	first_run->group_width = 0;
+	first_run->total_block_count = 0;
 
 	int biggest_file_size = 0;
 	FTSENT *current = first_file;
 	while (current != NULL) {
+		if (should_skip_file(current, options)) {
+			current = current->fts_link;
+			continue;
+		}
 		if (current->fts_statp->st_size > biggest_file_size)
 			biggest_file_size = current->fts_statp->st_size;
 
@@ -83,13 +102,18 @@ static void calculate_widths(FTSENT *first_file, LonglistingWidths *widths)
 		struct group *group = getgrgid(current->fts_statp->st_gid);
 		size_t user_len = strlen(user->pw_name);
 		size_t group_len = strlen(group->gr_name);
-		if ((signed)user_len > widths->user_width)
-			widths->user_width = user_len;
-		if ((signed)group_len > widths->group_width)
-			widths->group_width = group_len;
+		if ((signed)user_len > first_run->user_width)
+			first_run->user_width = user_len;
+		if ((signed)group_len > first_run->group_width)
+			first_run->group_width = group_len;
+		first_run->total_block_count += (current->fts_statp->st_blocks / 2);
+
+		// fprintf(stderr, "%s: %zu\n", current->fts_name,
+		// 	current->fts_statp->st_blocks / 2);
+
 		current = current->fts_link;
 	}
-	widths->size_width = number_of_digits(biggest_file_size);
+	first_run->size_width = number_of_digits(biggest_file_size);
 }
 
 // Usual UNIX file desciption, e.g "drwxrwxr-x"
@@ -121,9 +145,17 @@ static void set_file_description(struct stat *file_stat, char *file_description)
 	file_description[7] = (file_stat->st_mode & S_IROTH) ? 'r' : '-';
 	file_description[8] = (file_stat->st_mode & S_IWOTH) ? 'w' : '-';
 	file_description[9] = (file_stat->st_mode & S_IXOTH) ? 'x' : '-';
+	file_description[10] = '\0';
 }
 
-static void print_file(FTSENT *file, LonglistingWidths *widths, Options *options)
+static void get_time_str(FTSENT *file, char *time_str_buffer)
+{
+	time_t raw_time = file->fts_statp->st_mtime;
+	struct tm *time_info = localtime(&raw_time);
+	strftime(time_str_buffer, TIME_STR_LEN, "%b %d %R", time_info);
+}
+
+static void print_file(FTSENT *file, FirstRun *first_run, Options *options)
 {
 	if (options->long_listing) {
 		struct stat *file_stat = file->fts_statp;
@@ -133,9 +165,13 @@ static void print_file(FTSENT *file, LonglistingWidths *widths, Options *options
 		struct passwd *user = getpwuid(file_stat->st_uid);
 		struct group *group = getgrgid(file_stat->st_gid);
 
-		printf("%s %zu %*s %*s %*zu %s\n", file_description,
-		       file_stat->st_nlink, widths->user_width, user->pw_name, widths->group_width,
-		       group->gr_name, widths->size_width, file_stat->st_size, file->fts_name);
+		char time_str[TIME_STR_LEN];
+		get_time_str(file, time_str);
+
+		printf("%s %zu %*s %*s %*zu %s %s\n", file_description,
+		       file_stat->st_nlink, first_run->user_width, user->pw_name,
+		       first_run->group_width, group->gr_name, first_run->size_width,
+		       file_stat->st_size, time_str, file->fts_name);
 	} else {
 		printf("%s\n", file->fts_name);
 	}
@@ -160,22 +196,15 @@ static void list_files(Options *options)
 	// Get all files within that folder
 	FTSENT *current = fts_children(fts, 0);
 
-	LonglistingWidths widths;
+	FirstRun first_run;
 	if (options->long_listing) {
-		calculate_widths(current, &widths);
+		do_first_run(current, &first_run, options);
+		printf("total %d\n", first_run.total_block_count);
 	}
 
 	while (current != NULL) {
-		switch (current->fts_info) {
-		case FTS_DOT:
-			if (options->show_all) {
-				print_file(current, &widths, options);
-			}
-			break;
-		case FTS_D:
-		case FTS_F:
-			print_file(current, &widths, options);
-			break;
+		if (!should_skip_file(current, options)) {
+			print_file(current, &first_run, options);
 		}
 		current = current->fts_link;
 	}
