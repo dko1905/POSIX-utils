@@ -1,3 +1,4 @@
+# Binaries
 ls
 cat
 echo
@@ -6,3 +7,8 @@ true
 link
 unlink
 tee
+id
+zid
+
+# Zig
+zig-cache
