@@ -6,15 +6,11 @@ Compile C programs (default):
 ```sh
 make progs
 # or
-make all
+make
 ```
-Compile zig programs:
+To compile zig programs you need to switch to the zig branch.
 ```sh
-make zprogs
-```
-Clean all:
-```sh
-make clean
+git switch zig
 ```
 
 ## Style guide
