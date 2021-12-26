@@ -12,6 +12,7 @@ const unistd = @cImport({
     @cInclude("grp.h");
     @cInclude("string.h");
 });
+const Writer = @TypeOf(std.io.getStdOut().writer());
 
 const Error = error{
     GetGroupsError,
@@ -35,6 +36,27 @@ pub fn main() !void {
     var gpa = Gpa{};
     var galloc = gpa.allocator();
     defer _ = gpa.deinit();
+
+    // Parse args
+    const argv = std.os.argv;
+    const optstring: [*:0]const u8 = "Ggnru";
+    var _ch: c_int = undefined;
+    while (true) {
+        _ch = unistd.getopt(@intCast(c_int, argv.len), argv.ptr, optstring);
+        if (_ch == -1) break;
+        const ch = @intCast(u8, _ch);
+        switch (ch) {
+            'G' => G_flag = true,
+            'g' => g_flag = true,
+            'n' => n_flag = true,
+            'r' => r_flag = true,
+            'u' => u_flag = true,
+            else => {
+                try usage();
+                std.os.exit(1);
+            }
+        }
+    }
 
     // Retrieve values
     const uid = unix.getuid();
@@ -68,7 +90,7 @@ pub fn main() !void {
         }
     }
 
-    // Print values
+    // Print values (very large, very complex & very ugly)
     if (g_flag) {
         if (r_flag) {
             if (n_flag) {
@@ -83,12 +105,14 @@ pub fn main() !void {
                 try w.print("{}", .{egid});
             }
         }
+        try w.print("\n", .{});
     } else if (u_flag) {
         if (n_flag) {
             try w.print("{s}", .{euid_name});
         } else {
             try w.print("{}", .{euid});
         }
+        try w.print("\n", .{});
     } else if (G_flag) {
         if (n_flag) {
             try w.print("{s}", .{gid_name});
@@ -113,8 +137,8 @@ pub fn main() !void {
                 if (group == gid or (group == egid)) continue;
                 try w.print(" {}", .{group});
             }
-            try w.print("\n", .{});
         }
+        try w.print("\n", .{});
     } else {
         // Default
         try w.print("uid={}({s}) ", .{ uid, uid_name });
@@ -137,7 +161,6 @@ pub fn main() !void {
     }
 }
 
-// Reimplement syscall because std is wrong.
 fn getgroups(allocator: Allocator) ![]gid_t {
     const cap: c_int = unistd.getgroups(0, null);
     if (cap < 0) {
@@ -193,4 +216,10 @@ fn getgroupnames(allocator: Allocator, groups: []gid_t) ![][]u8 {
     }
 
     return list.toOwnedSlice();
+}
+
+fn usage() !void {
+    const err = std.io.getStdErr();
+    const w = err.writer();
+    try w.print("usage: {s} [-Ggrnu]\n", .{std.os.argv[0]});
 }
