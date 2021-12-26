@@ -1,14 +1,5 @@
 # Binaries
-ls
-cat
-echo
-false
-true
-link
-unlink
-tee
 id
-zid
 
 # Zig
 zig-cache
