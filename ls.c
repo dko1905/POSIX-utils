@@ -16,12 +16,17 @@
 
 #define TIME_STR_LEN 100 /* Length of the time-date string in the long listing. */
 
+/* ls options*/
+#define OPTIONS_STR "laC1"
 #define LONG_LISTING_OPT 'l'
 #define SHOW_ALL_OPT 'a'
+#define USE_COLUMNS 'C'
+#define USE_INDIVIDUAL_LISTING '1'
 
 typedef struct {
 	bool long_listing;
 	bool show_all;
+	bool use_columns;
 } Options;
 
 typedef struct {
@@ -47,15 +52,22 @@ static void parse_args(int argc, char **argv, Options *options, Paths *paths)
 {
 	options->show_all = false;
 	options->long_listing = false;
+	options->use_columns = true;
 
 	int opt;
-	while ((opt = getopt(argc, argv, "al")) != -1) {
+	while ((opt = getopt(argc, argv, OPTIONS_STR)) != -1) {
 		switch (opt) {
 		case SHOW_ALL_OPT:
 			options->show_all = true;
 			break;
 		case LONG_LISTING_OPT:
 			options->long_listing = true;
+			break;
+		case USE_COLUMNS:
+			options->use_columns = true;
+			break;
+		case USE_INDIVIDUAL_LISTING:
+			options->use_columns = false;
 			break;
 		default:
 			usage();
