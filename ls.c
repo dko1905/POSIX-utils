@@ -2,6 +2,7 @@
 #include <fts.h>
 #include <getopt.h>
 #include <grp.h>
+#include <linux/limits.h>
 #include <math.h>
 #include <pwd.h>
 #include <stdbool.h>
@@ -13,7 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define TIME_STR_LEN 100
+#define TIME_STR_LEN 100 /* Length of the time-date string in the long listing. */
 
 #define LONG_LISTING_OPT 'l'
 #define SHOW_ALL_OPT 'a'
@@ -24,22 +25,29 @@ typedef struct {
 } Options;
 
 typedef struct {
+	char **path_array; /* Array of all paths that should be listed */
+	int paths_count;
+} Paths;
+
+/*
+ * If neccessary, ls loops through the files twice.
+ * Once the first to collect data like the total block count and the maximum widths
+ * of certain elements in the table and once to actually list out the files.
+ */
+typedef struct {
 	int user_width;
 	int group_width;
 	int size_width;
 	int total_block_count;
 } FirstRun;
 
-static void init_options(Options *options)
+static void usage(void) { fprintf(stderr, "Usage: ls [-l -a] [files...]\n"); }
+
+static void parse_args(int argc, char **argv, Options *options, Paths *paths)
 {
 	options->show_all = false;
 	options->long_listing = false;
-}
 
-static void usage(void) { fprintf(stderr, "Usage: ls [-l -a] [files]\n"); }
-
-static void parse_args(int argc, char **argv, Options *options)
-{
 	int opt;
 	while ((opt = getopt(argc, argv, "al")) != -1) {
 		switch (opt) {
@@ -54,8 +62,40 @@ static void parse_args(int argc, char **argv, Options *options)
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	// Populate paths with an array of absolute paths
+	int number_of_pos_args = argc - optind;
+	if (number_of_pos_args == 0) {
+		paths->path_array = (char **)malloc(sizeof(char *) * 2);
+		paths->path_array[0] = realpath(".", NULL);
+		paths->path_array[1] = NULL;
+		paths->paths_count = 1;
+	} else {
+		paths->path_array =
+		    (char **)malloc(sizeof(char *) * number_of_pos_args + 1);
+		int option_index = 0;
+		int arg_index = optind;
+		while (arg_index < argc) {
+			paths->path_array[option_index] =
+			    realpath(argv[arg_index], NULL);
+			arg_index++;
+			option_index++;
+		}
+		paths->paths_count = number_of_pos_args;
+	}
 }
 
+static void free_paths_array(Paths *paths)
+{
+	for (int i = 0; i < paths->paths_count; i++) {
+		free(paths->path_array[i]);
+	}
+	free(paths->path_array);
+}
+
+/*
+ * This can be passed to fts_open() to determine the order in which fts poccesses files.
+ */
 static int compare_files_by_name(const FTSENT **ftsent_1, const FTSENT **ftsent_2)
 {
 	return strcmp((*ftsent_1)->fts_name, (*ftsent_2)->fts_name);
@@ -108,9 +148,6 @@ static void do_first_run(FTSENT *first_file, FirstRun *first_run, Options *optio
 			first_run->group_width = group_len;
 		first_run->total_block_count += (current->fts_statp->st_blocks / 2);
 
-		// fprintf(stderr, "%s: %zu\n", current->fts_name,
-		// 	current->fts_statp->st_blocks / 2);
-
 		current = current->fts_link;
 	}
 	first_run->size_width = number_of_digits(biggest_file_size);
@@ -157,67 +194,80 @@ static void get_time_str(FTSENT *file, char *time_str_buffer)
 
 static void print_file(FTSENT *file, FirstRun *first_run, Options *options)
 {
-	if (options->long_listing) {
-		struct stat *file_stat = file->fts_statp;
-		char file_description[11];
-		set_file_description(file_stat, file_description);
-
-		struct passwd *user = getpwuid(file_stat->st_uid);
-		struct group *group = getgrgid(file_stat->st_gid);
-
-		char time_str[TIME_STR_LEN];
-		get_time_str(file, time_str);
-
-		printf("%s %zu %*s %*s %*zu %s %s\n", file_description,
-		       file_stat->st_nlink, first_run->user_width, user->pw_name,
-		       first_run->group_width, group->gr_name, first_run->size_width,
-		       file_stat->st_size, time_str, file->fts_name);
-	} else {
+	if (!options->long_listing) {
 		printf("%s\n", file->fts_name);
+		return;
 	}
+	struct stat *file_stat = file->fts_statp;
+	char file_description[11];
+	set_file_description(file_stat, file_description);
+
+	struct passwd *user = getpwuid(file_stat->st_uid);
+	struct group *group = getgrgid(file_stat->st_gid);
+
+	char time_str[TIME_STR_LEN];
+	get_time_str(file, time_str);
+
+	if (first_run == NULL) {
+		printf("%s %zu %*s %*s %*zu %s %s\n", file_description,
+		       file_stat->st_nlink, 0, user->pw_name, 0, group->gr_name, 0,
+		       file_stat->st_size, time_str, file->fts_name);
+		return;
+	}
+	printf("%s %zu %*s %*s %*zu %s %s\n", file_description, file_stat->st_nlink,
+	       first_run->user_width, user->pw_name, first_run->group_width,
+	       group->gr_name, first_run->size_width, file_stat->st_size, time_str,
+	       file->fts_name);
 }
 
-static void list_files(Options *options)
+static void list_files(Options *options, Paths *paths)
 {
-	FTS *fts;
+	int fts_options = FTS_LOGICAL | FTS_NOCHDIR | FTS_SEEDOT;
+	bool previous_was_not_a_dir = false;
+	for (int i = 0; i < paths->paths_count; i++) {
+		FTS *fts;
+		char *fts_args[] = {paths->path_array[i], NULL};
+		fts = fts_open(fts_args, fts_options, &compare_files_by_name);
 
-	// getcwd() allocates a buffer with an adequate length buffer if NULL is
-	// supplied
-	char *cwd_buffer = NULL;
-	cwd_buffer = getcwd(NULL, 0);
+		FTSENT *parent = fts_read(fts);
 
-	// fts_open expects a null-terminated list of paths
-	char *fts_args[] = {cwd_buffer, NULL};
-	fts = fts_open(fts_args, FTS_LOGICAL | FTS_NOCHDIR | FTS_SEEDOT,
-		       &compare_files_by_name);
-
-	// Read the first file from the path, which is the path itself
-	fts_read(fts);
-	// Get all files within that folder
-	FTSENT *current = fts_children(fts, 0);
-
-	FirstRun first_run;
-	if (options->long_listing) {
-		do_first_run(current, &first_run, options);
-		printf("total %d\n", first_run.total_block_count);
-	}
-
-	while (current != NULL) {
-		if (!should_skip_file(current, options)) {
-			print_file(current, &first_run, options);
+		if (!S_ISDIR(parent->fts_statp->st_mode)) {
+			print_file(parent, NULL, options);
+			previous_was_not_a_dir = true;
+			continue;
 		}
-		current = current->fts_link;
-	}
 
-	fts_close(fts);
-	free(cwd_buffer);
+		if (previous_was_not_a_dir)
+			printf("\n");
+		printf("%s:\n", paths->path_array[i]);
+
+		FTSENT *current = fts_children(fts, 0);
+		FirstRun first_run;
+		if (options->long_listing) {
+			do_first_run(current, &first_run, options);
+			printf("total %d\n", first_run.total_block_count);
+		}
+
+		while (current != NULL) {
+			if (!should_skip_file(current, options)) {
+				print_file(current, &first_run, options);
+			}
+			current = current->fts_link;
+		}
+		fts_close(fts);
+
+		if (i + 1 < paths->paths_count) {
+			printf("\n");
+		}
+	}
 }
 
 int main(int argc, char **argv)
 {
 	Options options;
-	init_options(&options);
-	parse_args(argc, argv, &options);
-	list_files(&options);
+	Paths paths;
+	parse_args(argc, argv, &options, &paths);
+	list_files(&options, &paths);
+	free_paths_array(&paths);
 	return EXIT_SUCCESS;
 }
