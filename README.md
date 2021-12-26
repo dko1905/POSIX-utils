@@ -2,7 +2,7 @@
 Utilities implemented as specified by [POSIX.1-2017](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html).
 
 ## Compiling
-Compile C programs (default):
+Compile programs (default):
 ```sh
 make progs
 # or
