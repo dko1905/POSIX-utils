@@ -1,22 +1,17 @@
 .POSIX:
 .SUFFIXES:
-.SUFFIXES: .c .zig
+.SUFFIXES: .zig
 
 include config.mk
 
-PROGS=cat ls echo false true link unlink tee id
-ZPROGS=zid
+PROGS=id
 
 all: progs
 progs: $(PROGS)
-zprogs: $(ZPROGS)
-
-.c:
-	$(CC) $(MYCFLAGS) $(MYLDFLAGS) $< -o $@
 
 .zig:
 	$(ZCC) $(MYZFLAGS) $<
-zid: zid.zig # id.zig uses libc
+id: id.zig # id.zig uses libc
 	$(ZCC) $(MYZFLAGS) -lc $<
 
 clean:
