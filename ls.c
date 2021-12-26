@@ -20,8 +20,8 @@
 #define OPTIONS_STR "laC1"
 #define LONG_LISTING_OPT 'l'
 #define SHOW_ALL_OPT 'a'
-#define USE_COLUMNS 'C'
-#define USE_INDIVIDUAL_LISTING '1'
+#define COLUMNS_OPT 'C'
+#define INDIVIDUAL_LISTING_OPT '1'
 
 typedef struct {
 	bool long_listing;
@@ -63,10 +63,10 @@ static void parse_args(int argc, char **argv, Options *options, Paths *paths)
 		case LONG_LISTING_OPT:
 			options->long_listing = true;
 			break;
-		case USE_COLUMNS:
+		case COLUMNS_OPT:
 			options->use_columns = true;
 			break;
-		case USE_INDIVIDUAL_LISTING:
+		case INDIVIDUAL_LISTING_OPT:
 			options->use_columns = false;
 			break;
 		default:
