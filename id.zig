@@ -1,9 +1,8 @@
 const std = @import("std");
 
 const ArrayList = std.ArrayList;
-const unix = std.os.linux;
-const gid_t = unix.gid_t;
-const uid_t = unix.uid_t;
+const gid_t = std.os.linux.gid_t;
+const uid_t = std.os.linux.uid_t;
 const Allocator = std.mem.Allocator;
 const Gpa = std.heap.GeneralPurposeAllocator(.{});
 const unistd = @cImport({
@@ -59,19 +58,19 @@ pub fn main() !void {
     }
 
     // Retrieve values
-    const uid = unix.getuid();
+    const uid = getuid();
     const uid_name = try getusername(galloc, uid);
     defer galloc.free(uid_name);
 
-    const euid = unix.geteuid();
+    const euid = geteuid();
     const euid_name = try getusername(galloc, euid);
     defer galloc.free(euid_name);
 
-    const gid = unix.getgid();
+    const gid = getgid();
     const gid_name = try getgroupname(galloc, gid);
     defer galloc.free(gid_name);
 
-    const egid = unix.getegid();
+    const egid = getegid();
     const egid_name = try getgroupname(galloc, gid);
     defer galloc.free(egid_name);
 
@@ -159,6 +158,22 @@ pub fn main() !void {
 
         try w.print("\n", .{});
     }
+}
+
+fn getuid() uid_t {
+    return unistd.getuid();
+}
+
+fn geteuid() uid_t {
+    return unistd.geteuid();
+}
+
+fn getgid() gid_t {
+    return unistd.getgid();
+}
+
+fn getegid() gid_t {
+    return unistd.getegid();
 }
 
 fn getgroups(allocator: Allocator) ![]gid_t {
