@@ -183,6 +183,7 @@ fn getgroups(allocator: Allocator) ![]gid_t {
     }
 
     var arr: []gid_t = try allocator.alloc(gid_t, @intCast(usize, cap));
+    errdefer allocator.free(arr);
     if (unistd.getgroups(cap, &arr[0]) < 0) {
         return Error.GetGroupsError;
     }
